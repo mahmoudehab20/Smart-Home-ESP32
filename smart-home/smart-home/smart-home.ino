@@ -4,8 +4,9 @@
 #include <WiFiAP.h>
 #include <ESPAsyncWebServer.h>
 
-//pins
-#define gas 35
+//Define pins
+#define D0Gas 35
+#define A0Gas 32
 #define buzzer 14
 #define IRSensor 33
 #define servoMotor 13
@@ -15,20 +16,20 @@
 int relayGPIOs[4] = {15, 4, 5, 18};
 
 //variables
-
+//Servo object
 Servo myservo;
-
+//ESP32 WiFi name and password
 const char* ssid      ="INTELLHOME";
 const char* password  ="smarthome";
-
+//parameters for relay module API
 const char* PARAM_INPUT_1 = "relay";  
 const char* PARAM_INPUT_2 = "state";
-
+//PIR sensor variables
 unsigned long previousMillis=0;
 const long interval=10000;
-
+//Server port
 AsyncWebServer server(80);
-
+//HTML for web server(optional)
 const char home_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
 <head>
@@ -84,9 +85,9 @@ const char home_html[] PROGMEM = R"rawliteral(
 </body>
 </html>
 )rawliteral";
-
+//method to get gas reading to the API
 String ReadGas(){
-  int g=analogRead(gas);
+  int g=analogRead(A0Gas);
   g=map(g,0,4095,0,100);
   if(isnan(g)){
     return "--";
@@ -95,25 +96,15 @@ String ReadGas(){
     return String(g);
   }
 }
-
-String Light(){
-  int lightsens=digitalRead(lightSensor);  //light sensor
-  if(lightsens==0){
-   return String(lightsens);
-  }
-  else{
-    return String(lightsens);
-  }
-}
-
-
+//things that run one time at the startprogram only
 void setup() {
   
   //serial monitor setup
   Serial.begin(115200);
 
-  //pins setup
-  pinMode(gas,INPUT);
+  //pins Mode(INPUT/OUTPUT)
+  pinMode(D0Gas,INPUT);
+  pinMode(A0Gas,INPUT);
   pinMode(buzzer,OUTPUT);
   pinMode(IRSensor,INPUT);
   pinMode(lightSensor,INPUT);
@@ -135,25 +126,23 @@ void setup() {
   Serial.println(WiFi.softAPIP());
   server.begin();
   Serial.println("Server started");
-
+  //API for web server(optional)
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send_P(200, "text/html", home_html);
   });
-
+  //API to get gas reading
   server.on("/gas",HTTP_GET,[](AsyncWebServerRequest *request){
     request->send_P(200,"text/plain",ReadGas().c_str());
   });
-
+  //API to control light automatically 
   server.on("/auto",HTTP_GET,[](AsyncWebServerRequest *request){
-    request->send_P(200,"text/plain",Light().c_str());
-    String inputparameter;
-    if(request->hasParam("state")){
-      inputparameter=request->getParam("state")->value();
-      for(int i=0;i<=4;i++){
-        digitalWrite(relayGPIOs[i], !inputparameter.toInt());
-      }
+    int light=digitalRead(lightSensor);
+    for(int i=0;i<=4;i++){
+      digitalWrite(relayGPIOs[i],!light);
     }
+    request->send_P(200,"text/plain","DONE");
   });
+  //API to control light
   server.on("/update", HTTP_GET, [] (AsyncWebServerRequest *request) {
     String inputMessage;
     String inputParam;
@@ -178,7 +167,7 @@ void setup() {
 
 void loop() {
   //gas sensor
-  int gasSens =digitalRead(gas);     
+  int gasSens =digitalRead(D0Gas);     
   if(gasSens==1){
     for(int i=0;i<=4;i++){
     digitalWrite(buzzer,1);
@@ -223,7 +212,8 @@ void loop() {
     delay(1500);
     digitalWrite(buzzer,0);
     delay(500);
-  }}
+  }
+  }
   else{
     digitalWrite(buzzer,0);
   }
