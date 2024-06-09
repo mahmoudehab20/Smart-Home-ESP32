@@ -85,6 +85,7 @@ const char home_html[] PROGMEM = R"rawliteral(
 </body>
 </html>
 )rawliteral";
+
 //method to get gas reading to the API
 String ReadGas(){
   int g=analogRead(A0Gas);
@@ -96,6 +97,7 @@ String ReadGas(){
     return String(g);
   }
 }
+
 //things that run one time at the startprogram only
 void setup() {
   
@@ -126,14 +128,17 @@ void setup() {
   Serial.println(WiFi.softAPIP());
   server.begin();
   Serial.println("Server started");
+  
   //API for web server(optional)
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send_P(200, "text/html", home_html);
   });
+  
   //API to get gas reading
   server.on("/gas",HTTP_GET,[](AsyncWebServerRequest *request){
     request->send_P(200,"text/plain",ReadGas().c_str());
   });
+  
   //API to control light automatically 
   server.on("/auto",HTTP_GET,[](AsyncWebServerRequest *request){
     int light=digitalRead(lightSensor);
@@ -142,6 +147,7 @@ void setup() {
     }
     request->send_P(200,"text/plain","DONE");
   });
+  
   //API to control light
   server.on("/update", HTTP_GET, [] (AsyncWebServerRequest *request) {
     String inputMessage;
@@ -161,6 +167,7 @@ void setup() {
     }
     request->send(200, "text/plain", "OK");
   });
+  
   // Start server
   server.begin();
 }
@@ -178,7 +185,8 @@ void loop() {
   }
   else{
     digitalWrite(buzzer,0);
-  }                                   
+  }    
+  
   //IR sensor
   int distance =digitalRead(IRSensor); 
   if(distance==1){
@@ -189,7 +197,8 @@ void loop() {
   else{
     myservo.write(0);
     delay(30);
-  }                                   
+  }  
+  
   //flame sensor
   int flamesens=digitalRead(flame);   
   if(flame==1){
@@ -202,7 +211,8 @@ void loop() {
   }
   else{
     digitalWrite(buzzer,0);
-  }                                   
+  }    
+  
   //PIR sensor
   unsigned long currentMillis=millis();
   if(currentMillis-previousMillis>=interval){
