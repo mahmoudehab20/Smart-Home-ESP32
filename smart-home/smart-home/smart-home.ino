@@ -26,7 +26,7 @@ const char* PARAM_INPUT_1 = "relay";
 const char* PARAM_INPUT_2 = "state";
 //PIR sensor variables
 unsigned long previousMillis=0;
-const long interval=10000;
+const long interval=5000;
 //Server port
 AsyncWebServer server(80);
 //HTML for web server(optional)
@@ -59,6 +59,7 @@ const char home_html[] PROGMEM = R"rawliteral(
   <h4>Room 2</h4><label class="switch"><input type="checkbox" onchange="toggleLight(this)" id="2"><span class="slider"></span></label>
   <h4>Room 3</h4><label class="switch"><input type="checkbox" onchange="toggleLight(this)" id="3"><span class="slider"></span></label>
   <h4>Room 4</h4><label class="switch"><input type="checkbox" onchange="toggleLight(this)" id="4"><span class="slider"></span></label>
+  <h4>Auto</h4><label class="switch"><input type="checkbox" onchange="toggleAuto(this)" id="4"><span class="slider"></span></label>
   <p>
     <i style="color:#059e8a;"></i> 
     <span class="labels">GAS :-</span> 
@@ -81,11 +82,18 @@ const char home_html[] PROGMEM = R"rawliteral(
   xhttp.open("GET", "/gas", true);
   xhttp.send();
 }, 2000 ) ;
+function toggleAuto(element){
+setInterval(function(){
+  var x=new XMLHttpRequest();
+  if(element.checked){
+    x.open("GET","/auto",true);}
+  x.send();
+  },2000);
+  } 
 </script>
 </body>
 </html>
 )rawliteral";
-
 //method to get gas reading to the API
 String ReadGas(){
   int g=analogRead(A0Gas);
@@ -97,7 +105,6 @@ String ReadGas(){
     return String(g);
   }
 }
-
 //things that run one time at the startprogram only
 void setup() {
   
@@ -110,7 +117,7 @@ void setup() {
   pinMode(buzzer,OUTPUT);
   pinMode(IRSensor,INPUT);
   pinMode(lightSensor,INPUT);
-  pinMode(PIRSensor,INPUT);
+  pinMode(PIRSensor,INPUT_PULLUP);
   pinMode(flame,INPUT);
   myservo.attach(servoMotor);
   for(int i=1; i<=4; i++){
@@ -128,17 +135,14 @@ void setup() {
   Serial.println(WiFi.softAPIP());
   server.begin();
   Serial.println("Server started");
-  
   //API for web server(optional)
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send_P(200, "text/html", home_html);
   });
-  
   //API to get gas reading
   server.on("/gas",HTTP_GET,[](AsyncWebServerRequest *request){
     request->send_P(200,"text/plain",ReadGas().c_str());
   });
-  
   //API to control light automatically 
   server.on("/auto",HTTP_GET,[](AsyncWebServerRequest *request){
     int light=digitalRead(lightSensor);
@@ -147,7 +151,24 @@ void setup() {
     }
     request->send_P(200,"text/plain","DONE");
   });
-  
+  //API for PIR sensor
+  server.on("/pir",HTTP_GET,[](AsyncWebServerRequest *request){
+    //PIR sensor
+    long currentMillis=millis();
+    if(currentMillis-previousMillis>=interval && digitalRead(PIRSensor)==1){
+      previousMillis=currentMillis;
+      for(int i=0;i<=2;i++){
+      digitalWrite(buzzer,1);
+      delay(1500);
+      digitalWrite(buzzer,0);
+      delay(500);
+      request->send_P(200,"text/plain","1");
+    }}
+    else{
+      digitalWrite(buzzer,0);
+      request->send_P(200,"text/plain","0");
+    }
+  });
   //API to control light
   server.on("/update", HTTP_GET, [] (AsyncWebServerRequest *request) {
     String inputMessage;
@@ -167,7 +188,6 @@ void setup() {
     }
     request->send(200, "text/plain", "OK");
   });
-  
   // Start server
   server.begin();
 }
@@ -185,8 +205,7 @@ void loop() {
   }
   else{
     digitalWrite(buzzer,0);
-  }    
-  
+  }                                   
   //IR sensor
   int distance =digitalRead(IRSensor); 
   if(distance==1){
@@ -197,8 +216,7 @@ void loop() {
   else{
     myservo.write(0);
     delay(30);
-  }  
-  
+  }                                   
   //flame sensor
   int flamesens=digitalRead(flame);   
   if(flame==1){
@@ -211,20 +229,5 @@ void loop() {
   }
   else{
     digitalWrite(buzzer,0);
-  }    
-  
-  //PIR sensor
-  unsigned long currentMillis=millis();
-  if(currentMillis-previousMillis>=interval){
-    previousMillis=currentMillis;
-    for(int i=0;i<=2;i++){
-    digitalWrite(buzzer,1);
-    delay(1500);
-    digitalWrite(buzzer,0);
-    delay(500);
-  }
-  }
-  else{
-    digitalWrite(buzzer,0);
-  }
+  }                                   
 }
